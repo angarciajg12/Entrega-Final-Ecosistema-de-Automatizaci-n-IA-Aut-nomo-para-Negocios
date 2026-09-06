@@ -1,0 +1,2562 @@
+{
+  "name": "Proyecto Final – Automatización Inteligente para Gestión de Fallas de Equipos",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Sos un agente de clasificación de novedades de equipos de flota.\n\nAnalizá exclusivamente la siguiente descripción de una novedad:\n\nDESCRIPCIÓN:\n{{ $json.descripcion }}\n\nTu tarea es clasificar la novedad y devolver EXCLUSIVAMENTE un JSON válido.\n\nPara determinar la urgencia y la necesidad de detener el equipo, utilizá criterios inspirados en RCM (Reliability-Centered Maintenance), evaluando el impacto de la falla sobre la seguridad, la operación, el posible daño adicional al equipo y la continuidad operativa.\n\nFORMATO OBLIGATORIO:\n\n{\n  \"tipo_falla\": \"\",\n  \"urgencia\": \"\",\n  \"requiere_detener_equipo\": false,\n  \"resumen\": \"\"\n}\n\nVALORES PERMITIDOS:\n\n\"tipo_falla\" debe ser EXACTAMENTE uno de:\n- \"Mecánica\"\n- \"Eléctrica\"\n- \"Hidráulica\"\n- \"Neumática\"\n- \"Software/sistema\"\n- \"Mantenimiento\"\n- \"Otra\"\n\n\"urgencia\" debe ser EXACTAMENTE uno de:\n- \"Alta\"\n- \"Media\"\n- \"Baja\"\n\nREGLAS:\n\n1. No inventes información que no esté explícitamente presente en la descripción.\n\n2. Clasificá según el mecanismo principal de la falla:\n- Mecánica: frenos, motor, transmisión, rodamientos, piezas, roturas mecánicas.\n- Eléctrica: batería, luces, cableado, alternador, arranque eléctrico.\n- Hidráulica: mangueras, cilindros, bombas hidráulicas, pérdidas de fluido hidráulico.\n- Neumática: aire comprimido, circuitos o componentes neumáticos.\n- Software/Sistema: errores explícitamente relacionados con software, sistema electrónico de control o programación.\n- Mantenimiento: tareas preventivas o mantenimiento programado.\n- Otra: cuando no exista información suficiente para determinar la categoría.\n\n3. Antes de determinar la urgencia, evaluá los siguientes criterios inspirados en RCM:\n\n- Seguridad: si la falla puede generar riesgo para personas, terceros u operador.\n- Operación: si la falla impide o limita el cumplimiento de la función del equipo.\n- Daño potencial: si continuar operando puede producir daños mayores.\n- Continuidad operativa: si el equipo puede continuar funcionando de manera segura hasta una intervención programada.\n\n4. Urgencia:\n\n- Alta: existe riesgo para personas, terceros o equipo, puede producir daños importantes, existe pérdida de una función crítica o impide operar de manera segura.\n\n- Media: requiere reparación o revisión, afecta parcial o progresivamente la operación, pero no existe evidencia de riesgo inmediato.\n\n- Baja: problema menor, mantenimiento no crítico o condición que puede programarse sin comprometer seguridad ni operación.\n\n5. \"requiere_detener_equipo\" debe ser true únicamente cuando:\n- continuar operando pueda comprometer la seguridad,\n- continuar operando pueda provocar daños importantes,\n- exista pérdida de una función crítica,\n- o la descripción indique que el equipo no puede operar de forma segura.\n\nEn cualquier otro caso debe ser false.\n\n6. Si la información es insuficiente:\n- tipo_falla = \"Otra\"\n- No deduzcas una causa que no esté mencionada.\n- No asumas riesgos o consecuencias que no estén justificadas por la descripción.\n\n7. El resumen debe ser breve, técnico y basado exclusivamente en la descripción.\n\n8. No escribas explicaciones, Markdown ni texto adicional fuera del JSON.",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        640,
+        -64
+      ],
+      "id": "edb11314-89a3-4ed7-bfc7-b1d2eb28008e",
+      "name": "AI Agent",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\"tipo_falla\": \"Mecánica\",\n  \"urgencia\": \"Alta\",\n  \"requiere_detener_equipo\": true,\n  \"resumen\": \"Pérdida total de frenos en el camión mientras circulaba.\"\n}\n"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        848,
+        144
+      ],
+      "id": "591af87d-ade2-4dbe-8187-98904be1e8b7",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "19866e25-51ac-47eb-a78c-89b3ee418498",
+              "name": "record_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "a62157f6-a52c-4425-87b5-6132573d1072",
+              "name": "id_novedad",
+              "value": "={{ $json.fields['ID Novedad'] }}",
+              "type": "number"
+            },
+            {
+              "id": "1c52e61a-687b-44ec-a5b9-0ce3205095e5",
+              "name": "descripcion",
+              "value": "={{ $json.fields['Descripción'] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        416,
+        -64
+      ],
+      "id": "0805753b-7edb-46f5-a4ec-c5746b247c96",
+      "name": "PREPARAR - Datos para IA"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "includeDrafts": false,
+          "q": "\"VisionLink\"",
+          "readStatus": "both"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -768,
+        400
+      ],
+      "id": "6d3e593f-6d64-4dd4-91e3-546d1115be96",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "XFqb2ED0xdaoaZAA",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": "={{ $json.id }}",
+        "simple": false,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -624,
+        400
+      ],
+      "id": "93fc2f79-a89d-49a4-814e-40505e9c3a10",
+      "name": "Get a message",
+      "webhookId": "bcc9d68b-46b4-42f7-9a18-b2409d19b11d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "XFqb2ED0xdaoaZAA",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d7721ce3-b78b-454d-8413-61c9e3494a4f",
+              "name": "EQUIPO",
+              "value": "={{ $json.subject.match(/\\[(\\d+)\\]/)?.[1] }}",
+              "type": "string"
+            },
+            {
+              "id": "4f520446-84c7-4d2c-8142-21d37fab4b73",
+              "name": "DESCRIPCION",
+              "value": "={{ $json.text.match(/gravedad\\s+\\w+:\\s*(.*?)\\s+a las/i)?.[1] }}",
+              "type": "string"
+            },
+            {
+              "id": "65f2ea4f-c575-452d-822d-a7bc50961c48",
+              "name": "FECHA DE REPORTE",
+              "value": "={{    (() => {     const m = $json.text.match(/a las\\s+(\\d{2}:\\d{2})\\s+ART\\s+el\\s+(\\d{2})\\/(\\d{2})\\/(\\d{4})/i);     return m ? `${m[4]}-${m[3]}-${m[2]}T${m[1]}:00-03:00` : '';   })() }}",
+              "type": "string"
+            },
+            {
+              "id": "9400bdf2-816f-4bff-a322-4cfea8069409",
+              "name": "Gravedad",
+              "value": "={{    (() => {     const m = $json.text.match(/gravedad\\s+(Alta|Media|Baja)\\s*:/i);     if (!m) return '';     return m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();   })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -448,
+        400
+      ],
+      "id": "99c76a0c-132a-46f0-a308-8aaa502f3062",
+      "name": "EXTRAER - Datos VL"
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appcuKNTcL6AaoqSA",
+          "mode": "list",
+          "cachedResultName": "Novedades de Equipos",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbltqAoKZcPfVUW4N",
+          "mode": "list",
+          "cachedResultName": "Equipos",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA/tbltqAoKZcPfVUW4N"
+        },
+        "filterByFormula": "={Nombre/Patente} = {{ $json.EQUIPO }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        -288,
+        400
+      ],
+      "id": "3fe35358-6ae7-4572-bbe0-6c8216fa717f",
+      "name": "BUSCAR - Equipo",
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "2AA348hUOWhXdeG9",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appcuKNTcL6AaoqSA",
+          "mode": "list",
+          "cachedResultName": "Novedades de Equipos",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblfYiufD9oS3z431",
+          "mode": "list",
+          "cachedResultName": "Usuarios",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA/tblfYiufD9oS3z431"
+        },
+        "filterByFormula": "{Nombre} = \"Visionlink\"",
+        "returnAll": false,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        -112,
+        400
+      ],
+      "id": "7c124737-f6b4-43b7-b171-2e4b10659dee",
+      "name": "BUSCAR - USUARIO",
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "2AA348hUOWhXdeG9",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appcuKNTcL6AaoqSA",
+          "mode": "list",
+          "cachedResultName": "Novedades de Equipos",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblZUdQnlpy7RTSUO",
+          "mode": "list",
+          "cachedResultName": "Novedades",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA/tblZUdQnlpy7RTSUO"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Requiere Detener Equipo (IA)": false,
+            "Fecha Reporte": "={{ $('EXTRAER - Datos VL').item.json['FECHA DE REPORTE'] }}",
+            "Equipo": "={{ [ $('BUSCAR - Equipo').item.json.id ] }}",
+            "Usuario Reporta": "={{ [ $('BUSCAR - USUARIO').item.json.id ] }}",
+            "Descripción": "={{ $('EXTRAER - Datos VL').item.json.DESCRIPCION }}",
+            "Estado": "Pendiente",
+            "Urgencia (IA)": "={{ $('EXTRAER - Datos VL').item.json.Gravedad }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ID Novedad",
+              "displayName": "ID Novedad",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Fecha Reporte",
+              "displayName": "Fecha Reporte",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Equipo",
+              "displayName": "Equipo",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Usuario Reporta",
+              "displayName": "Usuario Reporta",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Descripción",
+              "displayName": "Descripción",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Tipo Falla (IA)",
+              "displayName": "Tipo Falla (IA)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Mecánica",
+                  "value": "Mecánica"
+                },
+                {
+                  "name": "Software/sistema",
+                  "value": "Software/sistema"
+                },
+                {
+                  "name": "Eléctrica",
+                  "value": "Eléctrica"
+                },
+                {
+                  "name": "Hidráulica",
+                  "value": "Hidráulica"
+                },
+                {
+                  "name": "Neumática",
+                  "value": "Neumática"
+                },
+                {
+                  "name": "Otra",
+                  "value": "Otra"
+                },
+                {
+                  "name": "Mantenimiento",
+                  "value": "Mantenimiento"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Urgencia (IA)",
+              "displayName": "Urgencia (IA)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Alta",
+                  "value": "Alta"
+                },
+                {
+                  "name": "Media",
+                  "value": "Media"
+                },
+                {
+                  "name": "Baja",
+                  "value": "Baja"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Requiere Detener Equipo (IA)",
+              "displayName": "Requiere Detener Equipo (IA)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Resumen IA",
+              "displayName": "Resumen IA",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Estado",
+              "displayName": "Estado",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Pendiente",
+                  "value": "Pendiente"
+                },
+                {
+                  "name": "Procesado por IA",
+                  "value": "Procesado por IA"
+                },
+                {
+                  "name": "En Revisión Mantenimiento",
+                  "value": "En Revisión Mantenimiento"
+                },
+                {
+                  "name": "Aprobado",
+                  "value": "Aprobado"
+                },
+                {
+                  "name": "OT Creada",
+                  "value": "OT Creada"
+                },
+                {
+                  "name": "Cerrado",
+                  "value": "Cerrado"
+                },
+                {
+                  "name": "En Proceso",
+                  "value": "En Proceso"
+                },
+                {
+                  "name": "Resuelto",
+                  "value": "Resuelto"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "OT Asociada",
+              "displayName": "OT Asociada",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Log_Errores",
+              "displayName": "Log_Errores",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "ultima modificación",
+              "displayName": "ultima modificación",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "fecha de creacion",
+              "displayName": "fecha de creacion",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        128,
+        272
+      ],
+      "id": "52cecc06-cce3-4934-89c4-85a90fa952c0",
+      "name": "CREA NOVEDAD VL",
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "2AA348hUOWhXdeG9",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "@mantenimiento_alertas_ia_demo",
+        "message": "=🚨 ALERTA DE ALTA URGENCIA – REVISIÓN REQUERIDA\n\nSe solicita analizar la siguiente novedad:\n\n📅 Fecha: {{ DateTime.fromISO($('AIRTABLE - Guardar Análisis IA').item.json.fields['fecha de creacion']).setZone('America/Argentina/Buenos_Aires').toFormat('dd/MM/yyyy HH:mm') }}\n\n🔢 ID Novedad: {{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['ID Novedad'] }}\n\n📝 Descripción: {{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['Descripción'] }}\n\n🔧 Tipo de falla: {{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['Tipo Falla (IA)'] }}\n\n⚠️ Urgencia: {{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['Urgencia (IA)'] }}\n\n🛑 Requiere detener el equipo: {{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['Requiere Detener Equipo (IA)'] ? 'Sí' : 'No' }}\n\n🤖 Resumen IA: {{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['Resumen IA'] }}\n\nPor favor, revise la novedad y seleccione si corresponde aprobar o rechazar su tratamiento.",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1360,
+        -304
+      ],
+      "id": "e9d97a11-33dd-4d4c-939a-b4c8080481f3",
+      "name": "TELEGRAM - Aprobación Mantenimiento - HITL",
+      "webhookId": "5651a914-e934-4764-b865-6b0737fd05cb",
+      "credentials": {
+        "telegramApi": {
+          "id": "VpMo2hSLym99OhAF",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appcuKNTcL6AaoqSA",
+          "mode": "list",
+          "cachedResultName": "Novedades de Equipos",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblfYiufD9oS3z431",
+          "mode": "list",
+          "cachedResultName": "Usuarios",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA/tblfYiufD9oS3z431"
+        },
+        "filterByFormula": "=RECORD_ID() = \"{{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['Usuario Reporta'][0] }}\"",
+        "returnAll": false,
+        "limit": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1808,
+        -96
+      ],
+      "id": "3012b89a-2894-4c53-a11d-eea309181886",
+      "name": "AIRTABLE - Buscar Usuario Reporta",
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "2AA348hUOWhXdeG9",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a4a5f6aa-8e7d-4e07-b841-20b654ed5b11",
+              "leftValue": "={{ $json.fields['Fecha Planificada'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "dateTime",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "d1f96f97-1d14-4846-922f-77f42e148c90",
+              "leftValue": "={{ $json.fields['Técnico Asignado'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "8f53a14c-0c41-464a-b28d-6ffe0f679980",
+              "leftValue": "={{ $json.fields['Prioridad Confirmada'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2368,
+        -672
+      ],
+      "id": "d21e2513-d7ea-44e0-9748-de90cadf805d",
+      "name": "IF - ¿Planificación completa?"
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appcuKNTcL6AaoqSA",
+          "mode": "list",
+          "cachedResultName": "Novedades de Equipos",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblZUdQnlpy7RTSUO",
+          "mode": "list",
+          "cachedResultName": "Novedades",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA/tblZUdQnlpy7RTSUO"
+        },
+        "filterByFormula": "=RECORD_ID() = \"{{ $('TRIGGER - Cambio en OT').item.json.fields['Novedad Origen'][0] }}\"",
+        "returnAll": false,
+        "limit": 1,
+        "options": {},
+        "sort": {
+          "property": []
+        }
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        2672,
+        -688
+      ],
+      "id": "71ad7b0c-c2ae-4699-a75e-e6dbd2f7d05d",
+      "name": "AIRTABLE - Buscar Novedad Origen",
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "2AA348hUOWhXdeG9",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appcuKNTcL6AaoqSA",
+          "mode": "list",
+          "cachedResultName": "Novedades de Equipos",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblfYiufD9oS3z431",
+          "mode": "list",
+          "cachedResultName": "Usuarios",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA/tblfYiufD9oS3z431"
+        },
+        "filterByFormula": "=RECORD_ID() = \"{{ $('AIRTABLE - Buscar Novedad Origen').item.json.fields['Usuario Reporta'][0] }}\"",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        2896,
+        -688
+      ],
+      "id": "1765addd-7cd4-4069-a009-6e3052eb1371",
+      "name": "AIRTABLE - Buscar Usuario Reporta OT",
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "2AA348hUOWhXdeG9",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.fields.Email }}",
+        "subject": "={{ $('AIRTABLE - Buscar Novedad Origen').item.json.fields['Descripción'] }}",
+        "message": "=Hola {{ $('AIRTABLE - Buscar Usuario Reporta OT').item.json.fields['Nombre'] }},\n\nTe informamos que la Novedad N.º {{ $('AIRTABLE - Buscar Novedad Origen').item.json.fields['ID Novedad'] }} fue aprobada por Mantenimiento y ya cuenta con una planificación para su atención.\n\nDescripción: {{ $('AIRTABLE - Buscar Novedad Origen').item.json.fields['Descripción'] }}\n\nPrioridad confirmada: {{ $('TRIGGER - Cambio en OT').item.json.fields['Prioridad Confirmada'] }}\n\nFecha planificada: {{ DateTime.fromISO($('TRIGGER - Cambio en OT').item.json.fields['Fecha Planificada']).toFormat('dd/MM/yyyy') }}\n\nTécnico asignado: {{ $('TRIGGER - Cambio en OT').item.json.fields['Técnico Asignado'] }}\n\nOrden de Trabajo N.º: {{ $('TRIGGER - Cambio en OT').item.json.fields['ID OT'] }}\n\nAnte cualquier cambio en la planificación, se actualizará el estado correspondiente.\n\nSaludos,\nSistema de Gestión de Novedades\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3120,
+        -688
+      ],
+      "id": "0fa102fc-6107-4a37-8825-f484db924745",
+      "name": "Gmail - Informar planificación",
+      "webhookId": "49bdc4cb-e111-4849-938e-e6c66d186fee",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "XFqb2ED0xdaoaZAA",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appcuKNTcL6AaoqSA",
+          "mode": "list",
+          "cachedResultName": "Novedades de Equipos",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblgzoiCsLkQInUC9",
+          "mode": "list",
+          "cachedResultName": "Ordenes_Trabajo",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA/tblgzoiCsLkQInUC9"
+        },
+        "filterByFormula": "=",
+        "returnAll": false,
+        "limit": 1,
+        "options": {},
+        "sort": {
+          "property": [
+            {
+              "field": "Ultima modificacion",
+              "direction": "desc"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        2128,
+        -672
+      ],
+      "id": "0c70ac4a-2d2e-4cdf-8a49-61ca3b056ffd",
+      "name": "Busca OT ultima modificada",
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "2AA348hUOWhXdeG9",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0330e75a-c9db-4de8-ab98-f1d5e8b7861e",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "992d6afe-c4d8-4eea-9e3f-3ea686603517",
+              "leftValue": "={{ $json.fields.Estado }}",
+              "rightValue": "Pendiente",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "07386332-479c-4120-95e5-f425294e703e",
+              "leftValue": "={{ $json.fields['Descripción'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "aab306e3-80ca-4a5c-b2b3-dde271452f9b",
+              "leftValue": "={{ $json.fields['Usuario Reporta'][0] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "146e3b39-0c7e-4ae0-b596-042e613336b1",
+              "leftValue": "={{ $json.fields.Equipo[0] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c21c0cf5-5260-46d6-9f2e-7077c05bdceb",
+      "name": "IF - Validar Datos Novedad",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        192,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appcuKNTcL6AaoqSA",
+          "mode": "list",
+          "cachedResultName": "Novedades de Equipos",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblNafPHEWeV1GApv",
+          "mode": "list",
+          "cachedResultName": "Log_Errores",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA/tblNafPHEWeV1GApv"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Resuelto": false,
+            "Novedad Relacionada": "={{ [ $('TRIGGER - Nueva Novedad').item.json.id ] }}",
+            "Tipo Error": "Falta Dato",
+            "Detalle": "La novedad tiene datos obligatorios incompletos",
+            "Fecha": "2026-08-19T17:48:49"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Id",
+              "displayName": "Id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Novedad Relacionada",
+              "displayName": "Novedad Relacionada",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Tipo Error",
+              "displayName": "Tipo Error",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Falta Dato",
+                  "value": "Falta Dato"
+                },
+                {
+                  "name": "Fallo API IA",
+                  "value": "Fallo API IA"
+                },
+                {
+                  "name": "Timeout",
+                  "value": "Timeout"
+                },
+                {
+                  "name": "Otro",
+                  "value": "Otro"
+                },
+                {
+                  "name": "Validación",
+                  "value": "Validación"
+                },
+                {
+                  "name": "Conexión",
+                  "value": "Conexión"
+                },
+                {
+                  "name": "Autenticación",
+                  "value": "Autenticación"
+                },
+                {
+                  "name": "Permisos",
+                  "value": "Permisos"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Detalle",
+              "displayName": "Detalle",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Resuelto",
+              "displayName": "Resuelto",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Fecha",
+              "displayName": "Fecha",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "07b51329-b25f-459b-bf86-0227bc698f20",
+      "name": "AIRTABLE - Registrar Error Datos",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        384,
+        272
+      ],
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "nyC9y9owoGsNbp9j",
+          "name": "Airtable account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-nano",
+          "mode": "list",
+          "cachedResultName": "gpt-5-nano"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        592,
+        112
+      ],
+      "id": "454f14ed-c28e-4700-b670-9cdf157cc606",
+      "name": "OPENAI - Clasificar Novedad",
+      "credentials": {
+        "openAiApi": {
+          "id": "HwY75w8TTtH1Yr2M",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appcuKNTcL6AaoqSA",
+          "mode": "list",
+          "cachedResultName": "Novedades de Equipos",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblZUdQnlpy7RTSUO",
+          "mode": "list",
+          "cachedResultName": "Novedades",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA/tblZUdQnlpy7RTSUO"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Tipo Falla (IA)": "={{ $json.output.tipo_falla }}",
+            "Urgencia (IA)": "={{ \n  $('PREPARAR - Datos para IA').item.json.fields['Urgencia (IA)']\n  || $json.output.urgencia\n}}",
+            "Resumen IA": "={{ $json.output.resumen }}",
+            "Requiere Detener Equipo (IA)": "={{ $json.output.requiere_detener_equipo }}",
+            "ID Novedad": "={{ $('PREPARAR - Datos para IA').item.json.fields['ID Novedad'] }}",
+            "Estado": "Procesado por IA"
+          },
+          "matchingColumns": [
+            "ID Novedad"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "ID Novedad",
+              "displayName": "ID Novedad",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Fecha Reporte",
+              "displayName": "Fecha Reporte",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Equipo",
+              "displayName": "Equipo",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Usuario Reporta",
+              "displayName": "Usuario Reporta",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Descripción",
+              "displayName": "Descripción",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Tipo Falla (IA)",
+              "displayName": "Tipo Falla (IA)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Mecánica",
+                  "value": "Mecánica"
+                },
+                {
+                  "name": "Software/sistema",
+                  "value": "Software/sistema"
+                },
+                {
+                  "name": "Eléctrica",
+                  "value": "Eléctrica"
+                },
+                {
+                  "name": "Hidráulica",
+                  "value": "Hidráulica"
+                },
+                {
+                  "name": "Neumática",
+                  "value": "Neumática"
+                },
+                {
+                  "name": "Otra",
+                  "value": "Otra"
+                },
+                {
+                  "name": "Mantenimiento",
+                  "value": "Mantenimiento"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Urgencia (IA)",
+              "displayName": "Urgencia (IA)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Alta",
+                  "value": "Alta"
+                },
+                {
+                  "name": "Media",
+                  "value": "Media"
+                },
+                {
+                  "name": "Baja",
+                  "value": "Baja"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Requiere Detener Equipo (IA)",
+              "displayName": "Requiere Detener Equipo (IA)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Resumen IA",
+              "displayName": "Resumen IA",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Estado",
+              "displayName": "Estado",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Pendiente",
+                  "value": "Pendiente"
+                },
+                {
+                  "name": "Procesado por IA",
+                  "value": "Procesado por IA"
+                },
+                {
+                  "name": "En Revisión Mantenimiento",
+                  "value": "En Revisión Mantenimiento"
+                },
+                {
+                  "name": "Aprobado",
+                  "value": "Aprobado"
+                },
+                {
+                  "name": "OT Creada",
+                  "value": "OT Creada"
+                },
+                {
+                  "name": "Cerrado",
+                  "value": "Cerrado"
+                },
+                {
+                  "name": "En Proceso",
+                  "value": "En Proceso"
+                },
+                {
+                  "name": "Resuelto",
+                  "value": "Resuelto"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "OT Asociada",
+              "displayName": "OT Asociada",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Log_Errores",
+              "displayName": "Log_Errores",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "ultima modificación",
+              "displayName": "ultima modificación",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "fecha de creacion",
+              "displayName": "fecha de creacion",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1008,
+        -80
+      ],
+      "id": "afa3b5ab-70e6-4c60-a349-2f421c528df8",
+      "name": "AIRTABLE - Guardar Análisis IA",
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "2AA348hUOWhXdeG9",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.fields['Urgencia (IA)'] }}",
+                    "rightValue": "Alta",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "f4f04609-f8db-4320-905f-671c88be4721"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Urgencias Altas"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "0be03d40-ce88-4bb6-ac7c-5d687b4dc90d",
+                    "leftValue": "={{ $json.fields['Urgencia (IA)'] }}",
+                    "rightValue": "Media",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Urgencias Medias"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "ba8fa881-d197-41ba-ae96-94193451ef20",
+                    "leftValue": "={{ $json.fields['Urgencia (IA)'] }}",
+                    "rightValue": "Baja",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Urgencias Bajas"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1184,
+        -96
+      ],
+      "id": "92f69a3f-35b6-43e1-80fa-b18aa6ece68d",
+      "name": "SWITCH - Clasificar por Urgencia"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "angarcia.work@gmail.com",
+        "subject": "={{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['Descripción'] }}",
+        "message": "=🚨 ALERTA DE ALTA URGENCIA – REVISIÓN REQUERIDA\n\nSe solicita analizar la siguiente novedad:\n\n📅 Fecha: {{ DateTime.fromISO($('AIRTABLE - Guardar Análisis IA').item.json.fields['fecha de creacion']).setZone('America/Argentina/Buenos_Aires').toFormat('dd/MM/yyyy HH:mm') }}\n\n🔢 ID Novedad: {{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['ID Novedad'] }}\n\n📝 Descripción: {{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['Descripción'] }}\n\n🔧 Tipo de falla: {{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['Tipo Falla (IA)'] }}\n\n⚠️ Urgencia: {{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['Urgencia (IA)'] }}\n\n🛑 Requiere detener el equipo: {{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['Requiere Detener Equipo (IA)'] ? 'Sí' : 'No' }}\n\n🤖 Resumen IA: {{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['Resumen IA'] }}\n\nPor favor, revise la novedad y seleccione si corresponde aprobar o rechazar su tratamiento.",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1504,
+        -48
+      ],
+      "id": "c3fdef98-d9a4-43d8-809d-64b247bbe664",
+      "name": "GMAIL - Solicitar Aprobación Mantenimiento",
+      "webhookId": "bd438479-2a3d-4ffe-8e23-a782dd78ccc4",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "XFqb2ED0xdaoaZAA",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9fbcc04c-7e18-4cd2-a52e-1f9ed6bbcdda",
+              "leftValue": "={{ $json.data.approved }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1632,
+        -240
+      ],
+      "id": "06a70335-3abd-4243-bf2f-e7d0e56e386f",
+      "name": "IF - ¿Novedad Aprobada?"
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appcuKNTcL6AaoqSA",
+          "mode": "list",
+          "cachedResultName": "Novedades de Equipos",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblgzoiCsLkQInUC9",
+          "mode": "list",
+          "cachedResultName": "Ordenes_Trabajo",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA/tblgzoiCsLkQInUC9"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Prioridad Sugerida (IA)": "={{ $('SWITCH - Clasificar por Urgencia').item.json.fields['Urgencia (IA)'] }}",
+            "Novedad Origen": "={{ [ $('AIRTABLE - Guardar Análisis IA').item.json.id ] }}",
+            "Estado OT": "Aprobada",
+            "Fecha Aprobación": "={{ DateTime.fromISO($json.data.respondedAt).toFormat(\"yyyy-MM-dd'T'HH:mm:ss\") }}",
+            "Aprobado Por": "Mantenimiento"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ID OT",
+              "displayName": "ID OT",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Novedad Origen",
+              "displayName": "Novedad Origen",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Prioridad Sugerida (IA)",
+              "displayName": "Prioridad Sugerida (IA)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Alta",
+                  "value": "Alta"
+                },
+                {
+                  "name": "Media",
+                  "value": "Media"
+                },
+                {
+                  "name": "Baja",
+                  "value": "Baja"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Prioridad Confirmada",
+              "displayName": "Prioridad Confirmada",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Alta",
+                  "value": "Alta"
+                },
+                {
+                  "name": "Media",
+                  "value": "Media"
+                },
+                {
+                  "name": "Baja",
+                  "value": "Baja"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Fecha Planificada",
+              "displayName": "Fecha Planificada",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Técnico Asignado",
+              "displayName": "Técnico Asignado",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Estado OT",
+              "displayName": "Estado OT",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Aprobada",
+                  "value": "Aprobada"
+                },
+                {
+                  "name": "En proceso",
+                  "value": "En proceso"
+                },
+                {
+                  "name": "Finalizada",
+                  "value": "Finalizada"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Aprobado Por",
+              "displayName": "Aprobado Por",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Fecha Aprobación",
+              "displayName": "Fecha Aprobación",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1920,
+        -416
+      ],
+      "id": "e42e8e80-8ba6-4edc-8c00-8260ccb7d1df",
+      "name": "AIRTABLE - Crear OT",
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "2AA348hUOWhXdeG9",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appcuKNTcL6AaoqSA",
+          "mode": "list",
+          "cachedResultName": "Novedades de Equipos",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblZUdQnlpy7RTSUO",
+          "mode": "list",
+          "cachedResultName": "Novedades",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA/tblZUdQnlpy7RTSUO"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Requiere Detener Equipo (IA)": false,
+            "Estado": "OT Creada",
+            "id": "={{ $('AIRTABLE - Guardar Análisis IA').item.json.id }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "ID Novedad",
+              "displayName": "ID Novedad",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Fecha Reporte",
+              "displayName": "Fecha Reporte",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Equipo",
+              "displayName": "Equipo",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Usuario Reporta",
+              "displayName": "Usuario Reporta",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Descripción",
+              "displayName": "Descripción",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Tipo Falla (IA)",
+              "displayName": "Tipo Falla (IA)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Mecánica",
+                  "value": "Mecánica"
+                },
+                {
+                  "name": "Software/sistema",
+                  "value": "Software/sistema"
+                },
+                {
+                  "name": "Eléctrica",
+                  "value": "Eléctrica"
+                },
+                {
+                  "name": "Hidráulica",
+                  "value": "Hidráulica"
+                },
+                {
+                  "name": "Neumática",
+                  "value": "Neumática"
+                },
+                {
+                  "name": "Otra",
+                  "value": "Otra"
+                },
+                {
+                  "name": "Mantenimiento",
+                  "value": "Mantenimiento"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Urgencia (IA)",
+              "displayName": "Urgencia (IA)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Alta",
+                  "value": "Alta"
+                },
+                {
+                  "name": "Media",
+                  "value": "Media"
+                },
+                {
+                  "name": "Baja",
+                  "value": "Baja"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Requiere Detener Equipo (IA)",
+              "displayName": "Requiere Detener Equipo (IA)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Resumen IA",
+              "displayName": "Resumen IA",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Estado",
+              "displayName": "Estado",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Pendiente",
+                  "value": "Pendiente"
+                },
+                {
+                  "name": "Procesado por IA",
+                  "value": "Procesado por IA"
+                },
+                {
+                  "name": "En Revisión Mantenimiento",
+                  "value": "En Revisión Mantenimiento"
+                },
+                {
+                  "name": "Aprobado",
+                  "value": "Aprobado"
+                },
+                {
+                  "name": "OT Creada",
+                  "value": "OT Creada"
+                },
+                {
+                  "name": "Cerrado",
+                  "value": "Cerrado"
+                },
+                {
+                  "name": "En Proceso",
+                  "value": "En Proceso"
+                },
+                {
+                  "name": "Resuelto",
+                  "value": "Resuelto"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "OT Asociada",
+              "displayName": "OT Asociada",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Log_Errores",
+              "displayName": "Log_Errores",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "ultima modificación",
+              "displayName": "ultima modificación",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "fecha de creacion",
+              "displayName": "fecha de creacion",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        2144,
+        -416
+      ],
+      "id": "d6761441-574e-4ba9-b4d5-9bf4ea752281",
+      "name": "AIRTABLE - Actualizar Estado Novedad",
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "2AA348hUOWhXdeG9",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.fields.Email }}",
+        "subject": "={{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['Resumen IA'] }}",
+        "message": "=Hola {{ $('AIRTABLE - Buscar Usuario Reporta').item.json.fields['Nombre'] }},  Te informamos que la Novedad N.º {{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['ID Novedad'] }} fue revisada por el sector de Mantenimiento y no fue aprobada para la generación de una Orden de Trabajo.  Descripción de la novedad: {{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['Descripción'] }}  Tipo de falla: {{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['Tipo Falla (IA)'] }} Urgencia: {{ $('AIRTABLE - Guardar Análisis IA').item.json.fields['Urgencia (IA)'] }}  Por favor, revisá la información cargada y, si corresponde, realizá las correcciones necesarias para que pueda ser evaluada nuevamente.  Saludos, Sistema de Gestión de Novedades",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2032,
+        -96
+      ],
+      "id": "972cbd2d-8730-469b-8213-843cbe790671",
+      "name": "GMAIL - Notificar Novedad Rechazada",
+      "webhookId": "7aa42d45-2de1-4bb7-9313-dad973955344",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "XFqb2ED0xdaoaZAA",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appcuKNTcL6AaoqSA",
+          "mode": "list",
+          "cachedResultName": "Novedades de Equipos",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblNafPHEWeV1GApv",
+          "mode": "list",
+          "cachedResultName": "Log_Errores",
+          "cachedResultUrl": "https://airtable.com/appcuKNTcL6AaoqSA/tblNafPHEWeV1GApv"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Resuelto": false,
+            "Tipo Error": "Fallo API IA",
+            "Detalle": "={{ $json.error?.message || $json.message || $json.error || 'Error al ejecutar el agente IA' }}",
+            "Fecha": "={{ $now.toISO() }}",
+            "Novedad Relacionada": "={{ [ $('PREPARAR - Datos para IA').item.json.record_id ] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Id",
+              "displayName": "Id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Novedad Relacionada",
+              "displayName": "Novedad Relacionada",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Tipo Error",
+              "displayName": "Tipo Error",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Falta Dato",
+                  "value": "Falta Dato"
+                },
+                {
+                  "name": "Fallo API IA",
+                  "value": "Fallo API IA"
+                },
+                {
+                  "name": "Timeout",
+                  "value": "Timeout"
+                },
+                {
+                  "name": "Otro",
+                  "value": "Otro"
+                },
+                {
+                  "name": "Validación",
+                  "value": "Validación"
+                },
+                {
+                  "name": "Conexión",
+                  "value": "Conexión"
+                },
+                {
+                  "name": "Autenticación",
+                  "value": "Autenticación"
+                },
+                {
+                  "name": "Permisos",
+                  "value": "Permisos"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Detalle",
+              "displayName": "Detalle",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Resuelto",
+              "displayName": "Resuelto",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Fecha",
+              "displayName": "Fecha",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1024,
+        144
+      ],
+      "id": "c566bdb9-70c6-493c-90bd-18aeaa57335f",
+      "name": "AIRTABLE - Fallo API IA",
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "2AA348hUOWhXdeG9",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "unit": "minutes"
+            }
+          ]
+        },
+        "authentication": "airtableOAuth2Api",
+        "baseId": {
+          "__rl": true,
+          "value": "https://airtable.com/appcuKNTcL6AaoqSA/tblZUdQnlpy7RTSUO/",
+          "mode": "url"
+        },
+        "tableId": {
+          "__rl": true,
+          "value": "https://airtable.com/appcuKNTcL6AaoqSA/tblZUdQnlpy7RTSUO/viwegOVWcqRo7O8bj?blocks=hide",
+          "mode": "url"
+        },
+        "triggerField": "fecha de creacion",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.airtableTrigger",
+      "typeVersion": 1,
+      "position": [
+        -176,
+        32
+      ],
+      "id": "a8fdec5c-d749-46c8-a7eb-766441837a91",
+      "name": "TRIGGER - Nueva Novedad",
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "2AA348hUOWhXdeG9",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 1,
+              "unit": "minutes"
+            }
+          ]
+        },
+        "authentication": "airtableOAuth2Api",
+        "baseId": {
+          "__rl": true,
+          "value": "https://airtable.com/appcuKNTcL6AaoqSA/",
+          "mode": "url"
+        },
+        "tableId": {
+          "__rl": true,
+          "value": "https://airtable.com/appcuKNTcL6AaoqSA/tblgzoiCsLkQInUC9/viwC83XSQ9nqrYfCC?blocks=hide",
+          "mode": "url"
+        },
+        "triggerField": "Ultima modificacion",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.airtableTrigger",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        -672
+      ],
+      "id": "3cfe0c70-67b0-43df-b15f-0cbc041e9eba",
+      "name": "TRIGGER - Cambio en OT",
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "2AA348hUOWhXdeG9",
+          "name": "Airtable account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "TRIGGER - Nueva Novedad": [
+      {
+        "json": {
+          "id": "recMht8JcCGjjDDfe",
+          "createdTime": "2026-08-27T18:17:40.000Z",
+          "fields": {
+            "Usuario Reporta": [
+              "rece3krHB53JfBioG"
+            ],
+            "ultima modificación": "2026-08-27T18:18:05.000Z",
+            "Fecha Reporte": "2026-08-25T15:17:00.000Z",
+            "Descripción": "Se detectó una pérdida de aceite en una manguera del sistema hidráulico.",
+            "ID Novedad": 40,
+            "fecha de creacion": "2026-08-27T18:17:40.000Z",
+            "Equipo": [
+              "recBzovDyg8ofiFuf"
+            ],
+            "Estado": "Pendiente"
+          }
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "AIRTABLE - Guardar Análisis IA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AIRTABLE - Fallo API IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR - Datos para IA": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a message": {
+      "main": [
+        [
+          {
+            "node": "EXTRAER - Datos VL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EXTRAER - Datos VL": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR - Equipo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR - Equipo": {
+      "main": [
+        [
+          {
+            "node": "BUSCAR - USUARIO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCAR - USUARIO": {
+      "main": [
+        [
+          {
+            "node": "CREA NOVEDAD VL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CREA NOVEDAD VL": {
+      "main": [
+        [
+          {
+            "node": "IF - Validar Datos Novedad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TELEGRAM - Aprobación Mantenimiento - HITL": {
+      "main": [
+        [
+          {
+            "node": "IF - ¿Novedad Aprobada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AIRTABLE - Buscar Usuario Reporta": {
+      "main": [
+        [
+          {
+            "node": "GMAIL - Notificar Novedad Rechazada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - ¿Planificación completa?": {
+      "main": [
+        [
+          {
+            "node": "AIRTABLE - Buscar Novedad Origen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AIRTABLE - Buscar Novedad Origen": {
+      "main": [
+        [
+          {
+            "node": "AIRTABLE - Buscar Usuario Reporta OT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AIRTABLE - Buscar Usuario Reporta OT": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Informar planificación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Busca OT ultima modificada": {
+      "main": [
+        [
+          {
+            "node": "IF - ¿Planificación completa?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Validar Datos Novedad": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR - Datos para IA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AIRTABLE - Registrar Error Datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OPENAI - Clasificar Novedad": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AIRTABLE - Guardar Análisis IA": {
+      "main": [
+        [
+          {
+            "node": "SWITCH - Clasificar por Urgencia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SWITCH - Clasificar por Urgencia": {
+      "main": [
+        [
+          {
+            "node": "TELEGRAM - Aprobación Mantenimiento - HITL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GMAIL - Solicitar Aprobación Mantenimiento",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GMAIL - Solicitar Aprobación Mantenimiento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GMAIL - Solicitar Aprobación Mantenimiento": {
+      "main": [
+        [
+          {
+            "node": "IF - ¿Novedad Aprobada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - ¿Novedad Aprobada?": {
+      "main": [
+        [
+          {
+            "node": "AIRTABLE - Crear OT",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AIRTABLE - Buscar Usuario Reporta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AIRTABLE - Crear OT": {
+      "main": [
+        [
+          {
+            "node": "AIRTABLE - Actualizar Estado Novedad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRIGGER - Nueva Novedad": {
+      "main": [
+        [
+          {
+            "node": "IF - Validar Datos Novedad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRIGGER - Cambio en OT": {
+      "main": [
+        [
+          {
+            "node": "Busca OT ultima modificada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "9a1843a0-b060-4ad8-84e7-5823a1ad3316",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e6132b281aedc923d733fb79b7b85e6a02db8ce0b9c8be962f16aa2f7e795bdf"
+  },
+  "nodeGroups": [],
+  "id": "78Cs4tpn51OCARFe",
+  "tags": []
+}
